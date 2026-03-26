@@ -12,6 +12,55 @@ loadSessionBtn.addEventListener("click", loadSession);
 
 let currentProfile = null;
 
+function isPlainObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function sanitizeProfile(raw) {
+    if (!isPlainObject(raw)) {
+        return null;
+    }
+
+    if (typeof raw.username !== "string") {
+        return null;
+    }
+
+    if (!Array.isArray(raw.notifications)) {
+        return null;
+    }
+
+    const username = raw.username.trim();
+    if (username.length === 0) {
+        return null;
+    }
+
+    const notifications = [];
+    for (const item of raw.notifications) {
+        if (typeof item !== "string") {
+            return null;
+        }
+        notifications.push(item);
+    }
+
+    return {
+        username,
+        notifications
+    };
+}
+
+function parseAndValidateProfile(text) {
+    try {
+        const parsed = JSON.parse(text);
+        return sanitizeProfile(parsed);
+    } catch (error) {
+        return null;
+    }
+}
+
+function clearProfileDisplay() {
+    document.getElementById("username").textContent = "";
+    document.getElementById("notifications").textContent = "";
+}
 
 /* -------------------------
    Load Profile
@@ -20,9 +69,15 @@ let currentProfile = null;
 function loadProfile() {
 
     const text = document.getElementById("profileInput").value;
-
    
-    const profile = JSON.parse(text);
+    const profile = parseAndValidateProfile(text);
+
+     if (!profile) {
+        currentProfile = null;
+        clearProfileDisplay();
+        alert("Invalid profile data");
+        return;
+    }
 
     currentProfile = profile;
 
@@ -37,17 +92,17 @@ function loadProfile() {
 function renderProfile(profile) {
 
     
-    document.getElementById("username").innerHTML = profile.username;
+    document.getElementById("username").textContent = profile.username;
 
     const list = document.getElementById("notifications");
-    list.innerHTML = "";
+    list.textContent = "";
 
-    for (let n of profile.notifications) {
+    for (const n of profile.notifications) {
 
         const li = document.createElement("li");
 
         
-        li.innerHTML = n;
+        li.textContent = n;
 
         list.appendChild(li);
     }
@@ -59,7 +114,18 @@ function renderProfile(profile) {
 -------------------------- */
 
 function saveSession() {
-    localStorage.setItem("profile", JSON.stringify(currentProfile));
+   
+   if (!currentProfile) {
+        alert("No valid session to save");
+        return;
+    }
+
+    const safeProfile = {
+        username: currentProfile.username,
+        notifications: [...currentProfile.notifications]
+    };
+   
+    localStorage.setItem("profile", JSON.stringify(safeProfile));
 
     alert("Session saved");
 }
@@ -69,12 +135,22 @@ function loadSession() {
 
     const stored = localStorage.getItem("profile");
 
-    if (stored) {
-
-        const profile = JSON.parse(stored);
-
-        currentProfile = profile;
-
-        renderProfile(profile);
+    if (!stored) {
+        alert("No saved session found");
+        return;
     }
+
+    const profile = parseAndValidateProfile(stored);
+
+    if (!profile) {
+        currentProfile = null;
+        localStorage.removeItem("profile");
+        clearProfileDisplay();
+        alert("Stored session data is invalid");
+        return;
+    }
+
+    currentProfile = profile;
+
+    renderProfile(profile);
 }
